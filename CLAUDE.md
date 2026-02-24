@@ -29,8 +29,14 @@ python3 scripts/run_grading.py --student-id <학생ID> --mission-id linux_level2
 python3 scripts/run_grading.py --student-id <학생ID> --mission-id python_level1_mission01 --submission-dir /path/to/submission
 python3 scripts/run_grading.py --student-id <학생ID> --mission-id python_level1_mission02 --submission-dir /path/to/submission
 
+# 자료구조 미션 채점 (--submission-dir 필수)
+python3 scripts/run_grading.py --student-id <학생ID> --mission-id ds_level1_mission01 --submission-dir /path/to/submission
+
 # 샘플 정답 코드로 Python mission01 채점 (테스트용)
 python3 scripts/run_grading.py --student-id sample --mission-id python_level1_mission01 --submission-dir sample_submission
+
+# 샘플 정답 코드로 DS mission01 채점 (테스트용)
+python3 scripts/run_grading.py --student-id sample --mission-id ds_level1_mission01 --submission-dir sample_submission_ds
 ```
 
 테스트 디렉토리(`tests/`)는 존재하나 아직 구현된 테스트 없음.
@@ -65,30 +71,42 @@ linux-test/
 │   │   ├── account_validator.py
 │   │   ├── script_validator.py
 │   │   └── linux_auditor_validator.py  #   보안 감사 도구 (subprocess+tmpdir 기반)
-│   └── python/validators/              #   Python 미션용 (5개 + 헬퍼)
-│       ├── _helpers.py                 #     공통 유틸 (import_student_module 등)
-│       ├── model_validator.py
-│       ├── pattern_validator.py
-│       ├── cli_validator.py
-│       ├── persistence_validator.py
-│       └── log_analyzer_validator.py
+│   ├── python/validators/              #   Python 미션용 (5개 + 헬퍼)
+│   │   ├── _helpers.py                 #     공통 유틸 (import_student_module 등)
+│   │   ├── model_validator.py
+│   │   ├── pattern_validator.py
+│   │   ├── cli_validator.py
+│   │   ├── persistence_validator.py
+│   │   └── log_analyzer_validator.py
+│   └── ds/validators/                  #   자료구조 미션용 (4개)
+│       ├── structure_validator.py      #     AST 분석형 (Node 클래스, 금지 import)
+│       ├── basic_command_validator.py  #     subprocess형 (SET/GET/DEL/EXISTS/DBSIZE)
+│       ├── lru_validator.py            #     subprocess형 (LRU 제거, GET 갱신, INFO)
+│       └── ttl_validator.py            #     Popen형 (EXPIRE/TTL, lazy deletion)
 │
 ├── missions/                           # 미션 정의 (config.yaml + problem.md + solution.md)
 │   ├── linux/
 │   │   ├── level1/mission01/           #   리눅스 시스템 보안 및 관제 기초 설정
 │   │   └── level2/mission01/           #   리눅스 서버 보안 감사 도구 (Python 제출)
-│   └── python/
-│       ├── level1/mission01/           #   Python 도서 관리 시스템 코딩 시험
-│       │   └── template/              #     cli.py, filters.py, models.py, storage.py
-│       └── level1/mission02/           #   서버 접근 로그 분석기
-│           └── template/
-│               └── access_log_sample.csv
+│   ├── python/
+│   │   ├── level1/mission01/           #   Python 도서 관리 시스템 코딩 시험
+│   │   │   └── template/              #     cli.py, filters.py, models.py, storage.py
+│   │   └── level1/mission02/           #   서버 접근 로그 분석기
+│   │       └── template/
+│   │           └── access_log_sample.csv
+│   └── ds/
+│       └── level1/mission01/           #   Mini LRU 캐시 구현 시험
+│           └── template/              #     lru_cache.py, cli.py
 │
 ├── sample_submission/                  # python_level1_mission01 정답 예시 코드
 │   ├── models.py                       #   @dataclass Book
 │   ├── filters.py                      #   yield 제너레이터 + validate_args 데코레이터
 │   ├── storage.py                      #   JSONL 직렬화/역직렬화
 │   └── cli.py                          #   argparse CLI (add/list/search)
+│
+├── sample_submission_ds/               # ds_level1_mission01 정답 예시 코드
+│   ├── lru_cache.py                    #   Node + DoublyLinkedList + LRUCache
+│   └── cli.py                          #   Redis 스타일 REPL CLI
 │
 ├── results/                            # 채점 결과 출력 디렉토리
 ├── submissions/                        # 학생 제출물 보관 (빈 디렉토리)
@@ -252,6 +270,43 @@ CLI (run_grading.py)
 - `permission_audit`: api_keys 디렉토리 775+agent-common 권한 위반 미탐지
 
 **Validator 패턴**: subprocess 실행형 + 파일 I/O형 (tmpdir에 설정 파일 6개 생성 → 학생 코드 실행 → 리포트 파일 검증)
+
+---
+
+### ds_level1_mission01 — Mini LRU 캐시 구현 시험
+
+- **제한시간**: 900초 (15분) | **합격**: 70점
+- **실행 환경**: macOS/Linux 모두 가능 (subprocess + Popen 기반)
+- **제출물**: `lru_cache.py`, `cli.py` (2개 파일)
+
+| Validator | 가중치 | CheckItem (총 15개) | 배점 |
+|-----------|--------|---------------------|------|
+| `StructureValidator` | 25 | node_class | 10점 |
+| | | no_builtin_cache | 10점 (**AI 트랩**) |
+| | | linked_list_ops | 5점 |
+| `BasicCommandValidator` | 25 | cli_runnable | 3점 |
+| | | set_get | 8점 |
+| | | del_command | 4점 |
+| | | exists_dbsize | 5점 |
+| | | output_format | 5점 (**AI 트랩**) |
+| `LRUValidator` | 30 | config_maxmemory | 5점 |
+| | | lru_eviction | 8점 |
+| | | lru_get_refresh | 10점 (**AI 트랩**) |
+| | | info_memory | 7점 |
+| `TTLValidator` | 20 | expire_ttl_basic | 6점 |
+| | | ttl_expired_get | 8점 (**AI 트랩**) |
+| | | ttl_nonexistent | 6점 |
+
+**AI 트랩 포인트**:
+- `no_builtin_cache`: OrderedDict/deque/functools.lru_cache 사용 → Node 직접 구현 필요
+- `output_format`: Python `True`/`None` 출력 → Redis 형식 `OK`/`(nil)`/`"value"` 필요
+- `lru_get_refresh`: SET만 LRU 갱신, GET은 조회만 → GET도 move_to_front 필수
+- `ttl_expired_get`: 별도 타이머/스레드 TTL → GET 시 lazy deletion 필요
+
+**Validator 패턴 분류**:
+- AST 분석형: `StructureValidator` — Node 클래스, 금지 import, 연결 리스트 메서드 검사
+- subprocess 실행형: `BasicCommandValidator`, `LRUValidator` — `subprocess.run()` + stdin pipe
+- Popen형: `TTLValidator` — `subprocess.Popen()` + `time.sleep()`으로 TTL 만료 테스트
 
 ---
 
@@ -457,12 +512,12 @@ ai_traps:
 
 | 구분 | 수치 |
 |------|------|
-| 총 미션 수 | 4개 (Linux 2, Python 2) |
-| 총 Validator 클래스 | 10개 (Linux 5, Python 5) |
-| 총 CheckItem 수 | 43개 (Linux level1 12 + level2 7, Python mission01 17 + mission02 7) |
-| 총 AI 트랩 항목 | 14개 (Linux level1 2 + level2 4, mission01 4, mission02 4) |
-| 채점 결과 파일 | 6쌍 (JSON+MD) 생성 이력 존재 |
-| 정답 예시 코드 | `sample_submission/` (mission01 전용) |
+| 총 미션 수 | 5개 (Linux 2, Python 2, DS 1) |
+| 총 Validator 클래스 | 14개 (Linux 5, Python 5, DS 4) |
+| 총 CheckItem 수 | 58개 (Linux level1 12 + level2 7, Python mission01 17 + mission02 7, DS mission01 15) |
+| 총 AI 트랩 항목 | 18개 (Linux level1 2 + level2 4, Python mission01 4 + mission02 4, DS mission01 4) |
+| 채점 결과 파일 | 7쌍 이상 (JSON+MD) 생성 이력 존재 |
+| 정답 예시 코드 | `sample_submission/` (Python mission01), `sample_submission_ds/` (DS mission01) |
 
 ### 미구현 / 향후 작업
 

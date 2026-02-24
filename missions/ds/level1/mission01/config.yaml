@@ -1,0 +1,49 @@
+# 미션 메타데이터
+name: "Mini LRU 캐시 구현 시험"
+description: "이중 연결 리스트와 해시맵(dict)을 조합한 LRU 캐시, TTL 만료 관리, Redis 스타일 CLI 구현 능력을 검증"
+level: 1
+category: "ds"
+time_limit: 900  # 15분 (초 단위)
+passing_score: 70
+
+# 사용할 검증기 목록 (총 100점)
+validators:
+  - module: "plugins.ds.validators.structure_validator"
+    class: "StructureValidator"
+    weight: 25
+
+  - module: "plugins.ds.validators.basic_command_validator"
+    class: "BasicCommandValidator"
+    weight: 25
+
+  - module: "plugins.ds.validators.lru_validator"
+    class: "LRUValidator"
+    weight: 30
+
+  - module: "plugins.ds.validators.ttl_validator"
+    class: "TTLValidator"
+    weight: 20
+
+# 실행 환경 설정
+execution:
+  timeout: 300
+  sandbox: false
+  working_directory: null  # submission_dir 사용
+
+# AI 함정 요소 정리 (4개)
+ai_traps:
+  - item: "no_builtin_cache"
+    trap_description: "AI가 OrderedDict/deque/functools.lru_cache로 간편 구현할 수 있음"
+    correct_answer: "Node 클래스로 이중 연결 리스트 직접 구현"
+
+  - item: "output_format"
+    trap_description: "AI가 True/None 출력, GET 값에 따옴표 누락할 수 있음"
+    correct_answer: "OK/(nil)/(integer) N/\"value\" 형식 준수"
+
+  - item: "lru_get_refresh"
+    trap_description: "AI가 SET만 LRU 갱신하고 GET은 조회만 할 수 있음"
+    correct_answer: "GET도 접근 시간 갱신 필수 (move_to_front)"
+
+  - item: "ttl_expired_get"
+    trap_description: "AI가 만료 키를 별도 타이머/스레드로만 처리할 수 있음"
+    correct_answer: "GET 시 만료 확인 → 삭제 + (nil) 반환 (lazy deletion)"
